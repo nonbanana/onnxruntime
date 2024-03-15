@@ -38,7 +38,9 @@ Status Concat<T>::Compute(OpKernelContext* ctx) const {
   LOGS_DEFAULT(VERBOSE) << "axis: " << axis_;
   LOGS_DEFAULT(VERBOSE) << std::endl;
 
-  std::vector<int64_t> output_dims = input_tensors[0]->Shape().GetDims();
+  gsl::span output_dims_span = input_tensors[0]->Shape().GetDims();
+
+  TensorShapeVector output_dims(output_dims_span.begin(), output_dims_span.end());
 
   // 'Concat' mode
   if (!is_stack_) {

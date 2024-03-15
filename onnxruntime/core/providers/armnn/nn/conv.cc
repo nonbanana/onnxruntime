@@ -26,7 +26,7 @@ thread_local std::map<OpKernel*, armnn::NetworkId> Conv<T>::convLayers;
 template <typename T>
 armnn::IRuntimePtr Conv<T>::run = armnn::IRuntimePtr(nullptr, nullptr);
 
-armnn::Convolution2dDescriptor createConvDescriptor(std::vector<int64_t> pads, std::vector<int64_t> dilations, std::vector<int64_t> strides, bool biasEnabled) {
+armnn::Convolution2dDescriptor createConvDescriptor(ConvAttributes::ConvPadVector pads, TensorShapeVector dilations, TensorShapeVector strides, bool biasEnabled) {
   std::vector<int64_t> armnnStrides(2);
   armnnStrides[0] = (strides.size() == 2) ? strides[1] : 1;
   armnnStrides[1] = strides[0];
@@ -118,26 +118,26 @@ Status Conv<T>::Compute(OpKernelContext* context) const {
   LOGS_DEFAULT(VERBOSE) << "W " << W->Shape().ToString().c_str();
   if (B != nullptr) LOGS_DEFAULT(VERBOSE) << "B " << B->Shape().ToString().c_str();
 
-  std::vector<int64_t> kernel_shape;
+  TensorShapeVector kernel_shape;
   ORT_RETURN_IF_ERROR(conv_attrs_.ComputeKernelShape(W->Shape(), kernel_shape));
 
   ConvAttributes::ConvPadVector pads(conv_attrs_.pads);
   if (pads.empty()) {
     pads.resize(kernel_shape.size() * 2, 0);
   }
-  std::vector<int64_t> dilations(conv_attrs_.dilations);
+  TensorShapeVector dilations(conv_attrs_.dilations);
   if (dilations.empty()) {
     dilations.resize(kernel_shape.size(), 1);
   }
-  std::vector<int64_t> strides(conv_attrs_.strides);
+  TensorShapeVector strides(conv_attrs_.strides);
   if (strides.empty()) {
     strides.resize(kernel_shape.size(), 1);
   }
 
-  std::vector<int64_t> Y_dims;
+  TensorShapeVector Y_dims;
   Y_dims.insert(Y_dims.begin(), {N, M});
   TensorShape input_shape = X->Shape().Slice(2);
-  ORT_RETURN_IF_ERROR(conv_attrs_.InferOutputShape(input_shape, kernel_shape, strides, dilations, pads, Y_dims));
+  ORT_RETURN_IF_ERROR(conv_attrs_.InferPadsAndOutputShape(input_shape, kernel_shape, strides, dilations, pads, Y_dims));
   Tensor* Y = context->Output(0, TensorShape(Y_dims));
 
   bool biasEnabled = B != nullptr;
@@ -176,22 +176,9 @@ Status Conv<T>::Compute(OpKernelContext* context) const {
 
         weightShape[1] = weightShape[0];
         weightShape[0] = 1;
-        armnn::TensorInfo weightsInfo(weightShape, armnn::DataType::Float32);
-        armnn::ConstTensor weights(weightsInfo, k_data);
 
-        if (biasEnabled) {
-          armnn::TensorInfo biasDesc(ArmNNTensorShape(B->Shape()), armnn::DataType::Float32);
-          armnn::ConstTensor bias(biasDesc, b_data);
-          convolution_armnn = myNetwork->AddDepthwiseConvolution2dLayer(depthwiseDescriptor,
-                                                                        weights,
-                                                                        armnn::Optional<armnn::ConstTensor>(bias),
-                                                                        "depthwise_convolution_armnn");
-        } else {
-          convolution_armnn = myNetwork->AddDepthwiseConvolution2dLayer(depthwiseDescriptor,
-                                                                        weights,
-                                                                        armnn::EmptyOptional(),
-                                                                        "depthwise_convolution_armnn");
-        }
+        convolution_armnn = myNetwork->AddDepthwiseConvolution2dLayer(depthwiseDescriptor,
+                                                                      "depthwise_convolution_armnn");
       } else {
         // NCHWc convolution
         LOGS_DEFAULT(WARNING) << "ArmNN does not have support for NCHWc convolution; defaulting to cpu implementation";
@@ -200,22 +187,8 @@ Status Conv<T>::Compute(OpKernelContext* context) const {
       }
     } else {
       LOGS_DEFAULT(VERBOSE) << "ArmNN 2D convolution";
-      armnn::TensorInfo weightsInfo(weightShape, armnn::DataType::Float32);
-      armnn::ConstTensor weights(weightsInfo, k_data);
-
-      if (biasEnabled) {
-        armnn::TensorInfo biasDesc(ArmNNTensorShape(B->Shape()), armnn::DataType::Float32);
-        armnn::ConstTensor bias(biasDesc, b_data);
-        convolution_armnn = myNetwork->AddConvolution2dLayer(convolutionDescriptor,
-                                                             weights,
-                                                             armnn::Optional<armnn::ConstTensor>(bias),
-                                                             "convolution_armnn");
-      } else {
-        convolution_armnn = myNetwork->AddConvolution2dLayer(convolutionDescriptor,
-                                                             weights,
-                                                             armnn::EmptyOptional(),
-                                                             "convolution_armnn");
-      }
+      convolution_armnn = myNetwork->AddConvolution2dLayer(convolutionDescriptor,
+                                                           "convolution_armnn");
     }
 
     bool armnn_activ_enabled = false;
@@ -247,7 +220,19 @@ Status Conv<T>::Compute(OpKernelContext* context) const {
     armnn::IConnectableLayer* InputLayer = myNetwork->AddInputLayer(0);
     armnn::IConnectableLayer* OutputLayer = myNetwork->AddOutputLayer(0);
 
+    armnn::TensorInfo weightsInfo(weightShape, armnn::DataType::Float32);
+    armnn::ConstTensor weights(weightsInfo, k_data);
+    armnn::IConnectableLayer* const constantWeightsLayer = myNetwork->AddConstantLayer(weights, "weights");
+
     InputLayer->GetOutputSlot(0).Connect(convolution_armnn->GetInputSlot(0));
+    constantWeightsLayer->GetOutputSlot(0).Connect(convolution_armnn->GetInputSlot(1));
+    if (convolutionDescriptor.m_BiasEnabled) {
+      armnn::TensorInfo biasDesc(ArmNNTensorShape(B->Shape()), armnn::DataType::Float32);
+      armnn::ConstTensor bias(biasDesc, b_data);
+      armnn::IConnectableLayer* const constantBiasLayer = myNetwork->AddConstantLayer(bias, "bias");
+      constantBiasLayer->GetOutputSlot(0).Connect(convolution_armnn->GetInputSlot(2));
+    }
+
     if (armnn_activ_enabled) {
       convolution_armnn->GetOutputSlot(0).Connect(activation->GetInputSlot(0));
       activation->GetOutputSlot(0).Connect(OutputLayer->GetInputSlot(0));
