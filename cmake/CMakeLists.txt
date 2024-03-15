@@ -1148,10 +1148,10 @@ if (onnxruntime_USE_ACL OR onnxruntime_USE_ACL_1902 OR onnxruntime_USE_ACL_1905 
         IMPORTED_NO_SONAME 1
         IMPORTED_LOCATION "${onnxruntime_ACL_LIBS}/libarm_compute.so")
 
-    add_library(arm_compute_core SHARED IMPORTED)
-    set_target_properties(arm_compute_core PROPERTIES
-        IMPORTED_NO_SONAME 1
-        IMPORTED_LOCATION "${onnxruntime_ACL_LIBS}/libarm_compute_core.so")
+    # add_library(arm_compute_core SHARED IMPORTED)
+    # set_target_properties(arm_compute_core PROPERTIES
+    #     IMPORTED_NO_SONAME 1
+    #     IMPORTED_LOCATION "${onnxruntime_ACL_LIBS}/libarm_compute_core.so")
 
     add_library(arm_compute_graph SHARED IMPORTED)
     set_target_properties(arm_compute_graph PROPERTIES
@@ -1159,7 +1159,8 @@ if (onnxruntime_USE_ACL OR onnxruntime_USE_ACL_1902 OR onnxruntime_USE_ACL_1905 
         IMPORTED_LOCATION "${onnxruntime_ACL_LIBS}/libarm_compute_graph.so")
   endif()
 
-  list(APPEND onnxruntime_EXTERNAL_LIBRARIES arm_compute arm_compute_core arm_compute_graph)
+  # list(APPEND onnxruntime_EXTERNAL_LIBRARIES arm_compute arm_compute_core arm_compute_graph)
+  list(APPEND onnxruntime_EXTERNAL_LIBRARIES arm_compute arm_compute_graph)
 
 endif()
 
@@ -1178,10 +1179,10 @@ if (onnxruntime_USE_ARMNN)
         IMPORTED_NO_SONAME 1
         IMPORTED_LOCATION "${onnxruntime_ACL_LIBS}/libarm_compute.so")
 
-    add_library(arm_compute_core SHARED IMPORTED)
-    set_target_properties(arm_compute_core PROPERTIES
-        IMPORTED_NO_SONAME 1
-        IMPORTED_LOCATION "${onnxruntime_ACL_LIBS}/libarm_compute_core.so")
+    # add_library(arm_compute_core SHARED IMPORTED)
+    # set_target_properties(arm_compute_core PROPERTIES
+    #     IMPORTED_NO_SONAME 1
+    #     IMPORTED_LOCATION "${onnxruntime_ACL_LIBS}/libarm_compute_core.so")
 
     add_library(arm_compute_graph SHARED IMPORTED)
     set_target_properties(arm_compute_graph PROPERTIES
@@ -1196,7 +1197,8 @@ if (onnxruntime_USE_ARMNN)
         IMPORTED_LOCATION "${onnxruntime_ARMNN_LIBS}/libarmnn.so")
   endif()
 
-  list(APPEND onnxruntime_EXTERNAL_LIBRARIES armnn arm_compute arm_compute_core arm_compute_graph)
+  list(APPEND onnxruntime_EXTERNAL_LIBRARIES armnn arm_compute  arm_compute_graph)
+  # list(APPEND onnxruntime_EXTERNAL_LIBRARIES armnn arm_compute arm_compute_core arm_compute_graph)
 endif()
 
 if (onnxruntime_USE_DNNL)
