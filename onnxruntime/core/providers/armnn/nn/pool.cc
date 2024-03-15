@@ -30,7 +30,7 @@ thread_local std::map<OpKernel*, armnn::NetworkId> MaxPoolV8<T>::maxPoolLayers;
 template <typename T>
 armnn::IRuntimePtr MaxPoolV8<T>::run = armnn::IRuntimePtr(nullptr, nullptr);
 
-armnn::Pooling2dDescriptor createDescriptor(std::vector<int64_t> pads, std::vector<int64_t> strides, std::vector<int64_t> kernel_shape, armnn::PoolingAlgorithm pool_type, onnxruntime::PoolAttributes pool_attrs) {
+armnn::Pooling2dDescriptor createDescriptor(TensorShapeVector pads, TensorShapeVector strides, TensorShapeVector kernel_shape, armnn::PoolingAlgorithm pool_type, onnxruntime::PoolAttributes pool_attrs) {
   std::vector<int64_t> armnnStrides(2);
   armnnStrides[0] = (strides.size() == 2) ? strides[1] : 1;
   armnnStrides[1] = strides[0];
@@ -89,7 +89,7 @@ Status Pool<T, PoolType>::Compute(OpKernelContext* context) const {
   const Tensor* X = context->Input<Tensor>(0);
   const TensorShape& x_shape = X->Shape();
 
-  std::vector<int64_t> dilations(PoolBase::pool_attrs_.dilations);
+  TensorShapeVector dilations(PoolBase::pool_attrs_.dilations);
   std::vector<int64_t> armnnDilations(2);
   armnnDilations[0] = (dilations.size() == 2) ? dilations[1] : 1;
   armnnDilations[1] = (!dilations.empty()) ? dilations[0] : 1;
@@ -106,9 +106,9 @@ Status Pool<T, PoolType>::Compute(OpKernelContext* context) const {
     return s;
   }
 
-  std::vector<int64_t> pads = PoolBase::pool_attrs_.pads;
-  std::vector<int64_t> strides = PoolBase::pool_attrs_.strides;
-  std::vector<int64_t> kernel_shape = PoolBase::pool_attrs_.kernel_shape;
+  TensorShapeVector pads = PoolBase::pool_attrs_.pads;
+  TensorShapeVector strides = PoolBase::pool_attrs_.strides;
+  TensorShapeVector kernel_shape = PoolBase::pool_attrs_.kernel_shape;
 
   if (PoolBase::pool_attrs_.global_pooling) {
     const auto& input_dims = x_shape.GetDims();
@@ -117,7 +117,7 @@ Status Pool<T, PoolType>::Compute(OpKernelContext* context) const {
     pads.assign(kernel_shape.size(), 0);
   }
 
-  std::vector<int64_t> output_dims = PoolBase::pool_attrs_.SetOutputSize(x_shape, x_shape[1], &pads);
+  TensorShapeVector output_dims = PoolBase::pool_attrs_.SetOutputSize(x_shape, x_shape[1], &pads);
   Tensor* Y = context->Output(0, TensorShape(output_dims));
 
   const T* x_data = X->Data<T>();
@@ -196,8 +196,8 @@ Status MaxPoolV8<T>::Compute(OpKernelContext* context) const {
   const Tensor* X = context->Input<Tensor>(0);
   const TensorShape& x_shape = X->Shape();
 
-  std::vector<int64_t> dilations(PoolBase::pool_attrs_.dilations);
-  std::vector<int64_t> armnnDilations(2);
+  TensorShapeVector dilations(PoolBase::pool_attrs_.dilations);
+  TensorShapeVector armnnDilations(2);
   armnnDilations[0] = (dilations.size() == 2) ? dilations[1] : 1;
   armnnDilations[1] = (!dilations.empty()) ? dilations[0] : 1;
 
@@ -207,9 +207,9 @@ Status MaxPoolV8<T>::Compute(OpKernelContext* context) const {
     return s;
   }
 
-  std::vector<int64_t> pads = PoolBase::pool_attrs_.pads;
-  std::vector<int64_t> strides = PoolBase::pool_attrs_.strides;
-  std::vector<int64_t> kernel_shape = PoolBase::pool_attrs_.kernel_shape;
+  TensorShapeVector pads = PoolBase::pool_attrs_.pads;
+  TensorShapeVector strides = PoolBase::pool_attrs_.strides;
+  TensorShapeVector kernel_shape = PoolBase::pool_attrs_.kernel_shape;
 
   if (PoolBase::pool_attrs_.global_pooling) {
     const auto& input_dims = x_shape.GetDims();
@@ -218,7 +218,7 @@ Status MaxPoolV8<T>::Compute(OpKernelContext* context) const {
     pads.assign(kernel_shape.size(), 0);
   }
 
-  std::vector<int64_t> output_dims = PoolBase::pool_attrs_.SetOutputSize(x_shape, x_shape[1], &pads);
+  TensorShapeVector output_dims = PoolBase::pool_attrs_.SetOutputSize(x_shape, x_shape[1], &pads);
   Tensor* Y = context->Output(0, TensorShape(output_dims));
 
   const T* x_data = X->Data<T>();

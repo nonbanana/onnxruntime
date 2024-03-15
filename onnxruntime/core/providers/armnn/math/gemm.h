@@ -95,6 +95,17 @@ class Gemm : public onnxruntime::Gemm<T> {
 
       armnn::TensorInfo weightsInfo(weightShape, armnn::DataType::Float32);
       armnn::ConstTensor weights(weightsInfo, w_data);
+      armnn::IConnectableLayer* const constantWeightsLayer = myNetwork->AddConstantLayer(weights, "weights");
+
+      fc_armnn = myNetwork->AddFullyConnectedLayer(fcDescriptor,
+                                                   "fc_armnn");
+
+      armnn::IConnectableLayer* InputLayer = myNetwork->AddInputLayer(0);
+      armnn::IConnectableLayer* OutputLayer = myNetwork->AddOutputLayer(0);
+
+      InputLayer->GetOutputSlot(0).Connect(fc_armnn->GetInputSlot(0));
+      fc_armnn->GetOutputSlot(0).Connect(OutputLayer->GetInputSlot(0));
+      constantWeightsLayer->GetOutputSlot(0).Connect(fc_armnn->GetInputSlot(1));
 
       if (fcDescriptor.m_BiasEnabled) {
         armnn::TensorShape biasShape = ArmNNTensorShape(B->Shape());
@@ -106,22 +117,9 @@ class Gemm : public onnxruntime::Gemm<T> {
         }
         armnn::TensorInfo biasDesc(biasShape, armnn::DataType::Float32);
         armnn::ConstTensor bias(biasDesc, b_data);
-        fc_armnn = myNetwork->AddFullyConnectedLayer(fcDescriptor,
-                                                     weights,
-                                                     armnn::Optional<armnn::ConstTensor>(bias),
-                                                     "fc_armnn");
-      } else {
-        fc_armnn = myNetwork->AddFullyConnectedLayer(fcDescriptor,
-                                                     weights,
-                                                     armnn::EmptyOptional(),
-                                                     "fc_armnn");
+        armnn::IConnectableLayer* const constantBiasLayer = myNetwork->AddConstantLayer(bias, "bias");
+        constantBiasLayer->GetOutputSlot(0).Connect(fc_armnn->GetInputSlot(2));
       }
-
-      armnn::IConnectableLayer* InputLayer = myNetwork->AddInputLayer(0);
-      armnn::IConnectableLayer* OutputLayer = myNetwork->AddOutputLayer(0);
-
-      InputLayer->GetOutputSlot(0).Connect(fc_armnn->GetInputSlot(0));
-      fc_armnn->GetOutputSlot(0).Connect(OutputLayer->GetInputSlot(0));
 
       // Set the tensors in the network.
       armnn::TensorInfo inputTensorInfo(inputShape, armnn::DataType::Float32);
